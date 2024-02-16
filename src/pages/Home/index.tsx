@@ -1,4 +1,4 @@
-import { Play } from "@phosphor-icons/react";
+import { HandPalm, Play } from "@phosphor-icons/react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +10,7 @@ import {
   MinutesAmountInput,
   Separator,
   StartCountDownButton,
+  StopCountDownButton,
   TaskInput,
 } from "./styles";
 import { useEffect, useState } from "react";
@@ -28,6 +29,8 @@ interface Cycle {
   task: string;
   minutesAmount: number;
   startDate: Date;
+  interruptData?: Date;
+  finishedDate?: Date;
 }
 
 export function Home() {
@@ -50,9 +53,22 @@ export function Home() {
     let interval: number;
     if (activeCycle) {
       interval = setInterval(() => {
-        setAmountSecondsPassed(
-          differenceInSeconds(new Date(), activeCycle.startDate)
-        );
+        const secondDifference = differenceInSeconds(new Date(), activeCycle.startDate)
+
+        if(secondDifference >= totalSeconds){
+          setCycles(state => state.map(item => {
+            if(item.id === activeCycleId){
+              return {...item, finishedDate: new Date()}
+            } else {
+              return item
+            }
+          }))
+          setAmountSecondsPassed(totalSeconds)
+          clearInterval(interval)
+        } else {
+          setAmountSecondsPassed(secondDifference);
+        }
+
       }, 1000);
     }
 
@@ -79,6 +95,18 @@ export function Home() {
     reset();
   }
 
+  function handleInterruptCycle(){
+    setCycles(state => state.map(item => {
+      if(item.id === activeCycleId){
+        return {...item, interruptData: new Date()}
+      } else {
+        return item
+      }
+    }))
+    
+    setActiveCycleId(null);
+  }
+
   const totalSeconds = activeCycle ? activeCycle.minutesAmount * 60 : 0;
   // total de segundos econtrado pelo find ali no cycle menos quando segundos se passaram
   const currentSeconds = activeCycle ? totalSeconds - amountSecondPassed : 0;
@@ -89,14 +117,15 @@ export function Home() {
   const minutos = String(minutosAmount).padStart(2, "0");
   const seconds = String(secondsAmount).padStart(2, "0");
 
-  useEffect(()=>{
-    if(activeCycle){
-      document.title = `${minutos}:${seconds}`
+  useEffect(() => {
+    if (activeCycle) {
+      document.title = `${minutos}:${seconds}`;
     }
-  },[minutos, seconds, activeCycle])
+  }, [minutos, seconds, activeCycle]);
 
   const task = watch("task");
   const isSubmitDisabled = !task;
+
 
   return (
     <HomeContainer>
@@ -109,6 +138,7 @@ export function Home() {
             placeholder="Dê um nome para o seu projeto"
             list="task-suggestions"
             {...register("task")}
+            disabled={!!activeCycle}
           />
 
           <datalist id="task-suggestions">
@@ -123,6 +153,7 @@ export function Home() {
             step={5}
             min={5}
             max={60}
+            disabled={!!activeCycle}
             {...register("minutosAmount", { valueAsNumber: true })}
           />
 
@@ -139,10 +170,17 @@ export function Home() {
           <span>{seconds[1]}</span>
         </CountdownContainer>
 
-        <StartCountDownButton type="submit" disabled={isSubmitDisabled}>
-          <Play size={23} />
-          Começar
-        </StartCountDownButton>
+        {activeCycle ? (
+          <StopCountDownButton onClick={handleInterruptCycle} type="submit" >
+            <HandPalm size={24}/>
+              Interromper
+          </StopCountDownButton>
+        ) : (
+          <StartCountDownButton type="submit" disabled={isSubmitDisabled}>
+            <Play size={24} />
+            Começar
+          </StartCountDownButton>
+        )}
       </form>
     </HomeContainer>
   );
